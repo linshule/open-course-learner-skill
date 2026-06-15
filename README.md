@@ -1,6 +1,6 @@
 <div align="center">
 
-# 公开课学习助手 (open-course-learner)
+# 公开课学习助手 Skill (open-course-learner-skill)
 
 <p align="center">
   <sub>by <a href="https://github.com/linshule">@linshule</a></sub>
