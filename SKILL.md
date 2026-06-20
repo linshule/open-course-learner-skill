@@ -152,13 +152,24 @@ For each lab URL, generate a step-by-step tutorial document. This is the most in
 
    **Important**: If the environment cannot run tests (no compiler, no dependencies, restricted network), T1 + T2 are sufficient. Clearly state this limitation in the document.
 
-3. **Write the tutorial document.** Include all of the following:
+3. **Write the tutorial document.** The document MUST start with a **Section 0: 动手前准备（环境配置）** before any implementation content. Include all of the following:
+
+   **Section 0 — 环境配置 (mandatory, as the first section):**
+   - How to obtain the lab code (`git clone`, `git pull`, etc.)
+   - Which directory to work in
+   - How to run the initial (failing) test suite to confirm the environment works
+   - What the expected failure output looks like (so the user knows their setup is correct)
+   - A table of files: which files the user needs to modify, which are provided as-is
+   - Any required tools or dependencies (compiler version, packages, etc.)
+   - For multi-part labs: recommended implementation order with test commands for each part
+
+   After Section 0, continue with the standard content:
 
    - **Complete, working code** that passes all tests. This is NOT pseudo-code. It must be real, compilable/runnable code.
    - **WHY explanation** for every code block: why this approach, why this function, why this parameter value.
    - **Code diagrams**: Use Mermaid diagrams to illustrate complex control flows (see references/output-templates.md for templates).
    - **Interview prep notes**: what interviewers might ask about this lab, common follow-up questions.
-   - **Test verification**: the exact commands to run and the expected output.
+   - **Test verification**: the exact commands to run and the expected output. Include the actual PASS/FAIL output so the user can compare.
 
 4. **Verify correctness.** Apply T1+T2 verification at minimum. If T3 is possible, run the tests and include the output.
 
