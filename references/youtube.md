@@ -10,16 +10,41 @@ YouTube provides captions in three forms:
 
 Each track has a language code (`en`, `ja`, `zh-Hans`). Most educational content has English auto-captions.
 
-## 2. Auto-Fetch Workflow
+## 2. Auto-Fetch Workflow (Priority Order)
 
-**Step 1 — Extract the video ID.** YouTube URLs follow two patterns:
-```
-https://www.youtube.com/watch?v=dQw4w9WgXcQ
-https://youtu.be/dQw4w9WgXcQ
-```
-The ID is always `[a-zA-Z0-9_-]{11}`.
+The skill tries the following methods **in order**, moving to the next if the current one fails.
 
-**Step 2 — Try the simple API first.** Fetch with `webfetch`:
+### Tier 1 — yt-dlp (Python, preferred)
+
+Use the `youtube-transcript-api` Python library or `yt-dlp` for direct subtitle extraction:
+
+**Method A — youtube-transcript-api (recommended):**
+```bash
+pip install youtube-transcript-api
+python -c "
+from youtube_transcript_api import YouTubeTranscriptApi
+import json
+api = YouTubeTranscriptApi()
+transcript = api.fetch('{VIDEO_ID}')
+with open('transcript.json', 'w') as f:
+    json.dump(transcript, f, ensure_ascii=False)
+# Output format: [{'text': '...', 'duration': 2.5, 'offset': 0}, ...]
+"
+```
+
+**Method B — yt-dlp:**
+```bash
+pip install yt-dlp
+yt-dlp --write-auto-subs --skip-download --sub-langs en --convert-subs srt -o "transcript" "{URL}"
+```
+If blocked by YouTube's bot detection, try:
+```bash
+yt-dlp --cookies-from-browser chrome --write-auto-subs --skip-download --sub-langs en "{URL}"
+```
+
+### Tier 2 — webfetch to youtubetranscript.com
+
+Fetch with `webfetch`:
 ```
 https://youtubetranscript.com/?v={VIDEO_ID}
 ```
@@ -30,9 +55,10 @@ Returns clean JSON:
   {"text": "where we talk about machine learning.", "duration": 3.0, "offset": 2.5}
 ]
 ```
-This is the preferred method. No page parsing needed.
 
-**Step 3 — Fall back to page HTML.** Fetch the video page:
+### Tier 3 — webfetch YouTube page HTML
+
+Fetch the video page:
 ```
 https://www.youtube.com/watch?v={VIDEO_ID}
 ```
@@ -47,12 +73,14 @@ Search for `playerCaptionsTracklistRenderer` in the HTML. Inside it find the `ca
 - `kind: "asr"` = auto-generated. No `kind` = uploader-provided.
 - `languageCode` is the ISO two-letter code.
 
-**Step 4 — Fetch the caption data.** Take `baseUrl` and fetch it. Append `&fmt=json` for JSON:
+Fetch the caption data from `baseUrl`. Append `&fmt=json` for JSON:
 ```json
 {"events": [{"tStartMs": 0, "dDurationMs": 2500, "segs": [{"utf8": "Welcome"}]}]}
 ```
 
-**Step 5 — Convert to Markdown.** Format as a table with timestamps:
+## 3. Format Transcript
+
+Convert to Markdown. Format as a table with timestamps:
 ```markdown
 | Time | Text |
 |------|------|
@@ -61,37 +89,32 @@ Search for `playerCaptionsTracklistRenderer` in the HTML. Inside it find the `ca
 ```
 For long transcripts, plain text with a timestamp every 30 seconds works.
 
-## 3. Manual Fallback
+Always note the caption source (ASR auto-generated vs uploader-provided) so the user can gauge accuracy.
 
-When auto-fetch fails (captions disabled, region block, bot detection):
+## 4. Manual Fallback (when all auto methods fail)
 
 **Method A — Guide the user:**
 1. Open the video in a browser.
 2. Click **More** below the description, then **Show transcript**.
 3. Copy and paste the text.
 
-**Method B — youtube-dl (if installed):**
-```
-youtube-dl --write-auto-sub --skip-download --sub-lang en {URL}
-```
-Strips to a `.vtt` file. Extract text by removing header lines and timestamps.
-
-**Method C — Browser DevTools:**
+**Method B — Browser DevTools:**
 1. Open the video, open DevTools (F12).
 2. Network tab, filter `timedtext`, reload.
 3. Click the matching request, copy the response JSON.
 
-## 4. Common Issues
+## 5. Common Issues
 
 | Problem | Cause | Workaround |
 |---------|-------|------------|
+| yt-dlp: "Sign in to confirm you're not a bot" | YouTube IP block | Use `--cookies-from-browser` or fall back to manual |
+| youtube-transcript-api: RequestBlocked | Cloud IP blocked | Use yt-dlp with cookies, or manual fallback |
 | No captionTracks in page data | Captions disabled | Manual fallback |
 | Garbled technical terms | ASR accuracy limits | Mention to user; offer manual |
-| Page fetch returns consent wall | Region/cookie block | Use youtubetranscript.com |
+| Page fetch returns consent wall | Region/cookie block | Use yt-dlp or manual fallback |
 | HTTP 429 | Rate limited | Add delay; use manual |
-| Video unavailable | Removed/private | Inform user |
 
-## 5. Grep Patterns
+## 6. Grep Patterns
 
 ```
 # Extract YouTube video ID from any URL form
@@ -104,14 +127,16 @@ Strips to a `.vtt` file. Extract text by removing header lines and timestamps.
 "languageCode":"(\w+)"
 ```
 
-## 6. Priority Order
+## 7. Priority Order Summary
 
-1. `youtubetranscript.com/?v={ID}` — simplest, no parsing.
-2. Page HTML — parse `ytInitialPlayerResponse` for caption tracks.
-3. Manual methods — guide user or use youtube-dl.
+1. **yt-dlp / youtube-transcript-api** — most reliable against IP blocks
+2. **youtubetranscript.com webfetch** — simple, no parsing
+3. **YouTube page HTML** — parse `ytInitialPlayerResponse`
+4. **Manual methods** — guide user or use DevTools
 
-## 7. Notes
+## 8. Notes
 
 - YouTube Data API v3 is **not** required. Avoid it unless the user provides a key.
 - Do not download video files. Transcript only.
 - Mention caption source (ASR vs manual) when presenting results so the user can gauge accuracy.
+- If Python libraries are not available in the environment, skip directly to Tier 2 (webfetch).

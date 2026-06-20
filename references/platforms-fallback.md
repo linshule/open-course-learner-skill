@@ -1,6 +1,36 @@
 # Fallback Platform Subtitle Guide
 
-Use this guide when auto-acquisition fails or the user provides content from platforms other than Bilibili or YouTube. Walk the user step by step.
+Use this guide when:
+1. Auto-acquisition fails (blocked, timeout, no subtitles)
+2. User provides content from platforms other than Bilibili/YouTube
+3. User provides lecture notes URLs instead of video URLs
+
+## Lecture Notes as Primary Content Source
+
+Many courses provide detailed lecture notes (`.txt`, `.pdf`, `.md`). These are often **more accurate and structured** than video subtitles. When available, use them as the primary content source.
+
+### How to detect lecture notes
+
+When a user provides a course URL (not a video URL):
+
+1. Fetch the course homepage / schedule page.
+2. Look for links labeled: "Notes", "Lecture Notes", "Slides", "Readings".
+3. Common URL patterns:
+   - `.../notes/l01.txt`
+   - `.../notes/l01.pdf`
+   - `.../slides/lec1.pdf`
+4. If found: **fetch these notes** as the primary content source.
+5. If not found: fall back to video subtitle acquisition.
+
+### Combining lecture notes with video
+
+If both lecture notes and video URL are available:
+1. Use lecture notes as the primary content structure (they have correct ordering and terminology).
+2. Use video subtitles for supplementary material (verbal explanations, examples, Q&A).
+
+---
+
+Starting guide content below for video subtitles:
 
 ---
 

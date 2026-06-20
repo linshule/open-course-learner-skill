@@ -7,9 +7,9 @@ description: "Use when the user wants to learn a foreign CS open course with Chi
 
 ## Overview
 
-This skill lets you help a zero-basis Chinese CS learner study a foreign open course. It takes course URLs (lectures and labs), fetches subtitles from Bilibili or YouTube, translates everything into Chinese with key technical terms preserved, and generates four types of study documents per lecture.
+This skill lets you help a zero-basis Chinese CS learner study a foreign open course. It takes course URLs (lectures and labs), fetches content from video subtitles (Bilibili/YouTube) and/or course lecture notes, translates everything into Chinese with key technical terms preserved, and generates four types of study documents per lecture.
 
-The pipeline has 5 steps: user interaction, content acquisition, content processing, lab walkthrough, and output organization. Each lecture is processed one at a time to stay within context limits.
+The pipeline has 5 steps: user interaction, content acquisition, content processing, lab walkthrough, and output organization. Lectures can be processed one at a time (default) or in batches when the user explicitly requests it.
 
 Target audience: learners who know basic programming (variables, loops, functions) but do NOT know the course subject. They may or may not be comfortable with command-line tools. Always ask about their dev tool proficiency before generating lab materials.
 
@@ -37,24 +37,49 @@ If the user provides only partial information (e.g., just a course name without 
 
 ### Step 2: Content Acquisition
 
-For each lecture URL, determine the platform and fetch subtitles.
+For each lecture URL, determine the source type and fetch content. The skill supports **two content source types**: video subtitles and course lecture notes. Lecture notes are preferred when available (they are typically more structured and accurate than ASR-generated subtitles).
+
+#### Source Type Detection
+
+| Input Type | Examples | Priority |
+|------------|----------|----------|
+| Lecture notes URL | `notes/l01.txt`, `notes/l01.pdf` | **Highest** — use as primary content |
+| Video URL (Bilibili) | `bilibili.com/video/BV...` | High — auto-fetch subtitles |
+| Video URL (YouTube) | `youtube.com/watch`, `youtu.be/` | High — auto-fetch subtitles |
+| Other | Coursera, edX, MIT OCW, podcast | Medium — guide manual download |
+| Direct text paste | User pastes transcript or notes | Same as the source type |
+
+#### Video Subtitle Fetching
 
 **Platform auto-detection:**
 
 | URL Pattern | Platform | Action |
 |-------------|----------|--------|
-| `bilibili.com/video/` | Bilibili | Load `references/bilibili.md`, try auto-fetch via webfetch |
-| `youtube.com/watch` or `youtu.be/` | YouTube | Load `references/youtube.md`, try auto-fetch via webfetch |
+| `bilibili.com/video/` | Bilibili | Load `references/bilibili.md`, try auto-fetch |
+| `youtube.com/watch` or `youtu.be/` | YouTube | Load `references/youtube.md`, try auto-fetch |
 | Other | Unknown | Load `references/platforms-fallback.md`, guide manual download |
 
-**Auto-fetch flow:**
+**Auto-fetch flow (tiered, try in order):**
 
-1. Load the platform-specific reference file.
-2. Use `webfetch` to get the video page and extract subtitle/transcript data.
-3. If auto-fetch succeeds, parse the subtitle text and proceed.
-4. If auto-fetch fails (blocked, no subtitles, wrong format), guide the user to manually download subtitle files (.srt, .ass, .vtt, or plain text) and paste the content.
+1. **Tier 1 — Python tools** (if available): Use `yt-dlp` or `youtube-transcript-api` for YouTube; use Bilibili API for Bilibili. These bypass browser-based restrictions.
+2. **Tier 2 — webfetch**: Use `webfetch` to get the video page and extract subtitle/transcript data.
+3. **Tier 3 — Manual**: Guide the user to manually download subtitle files (.srt, .ass, .vtt, or plain text) and paste the content.
 
 **Direct text input:** If the user directly pastes subtitle text or transcript content, skip the fetch step and process the provided text directly.
+
+#### Lecture Notes as Content Source
+
+If the user provides a lecture notes URL (e.g., `http://nil.csail.mit.edu/6.5840/2025/notes/l01.txt`), **fetch these notes first** as the primary content source. Lecture notes are often more accurate, structured, and complete than video subtitles.
+
+Benefits of using lecture notes:
+- No ASR errors or transcription gaps
+- Structured with headings, code blocks, and bullet points
+- Contains all key concepts in the correct order
+- Cover material that may be cut from video recordings
+
+If both video URL and lecture notes URL are provided:
+1. Use lecture notes as the primary content structure.
+2. Use video subtitles as supplementary material (for quotes, timing references, and verbal explanations).
 
 ---
 
@@ -115,20 +140,27 @@ For each lab URL, generate a step-by-step tutorial document. This is the most in
 
 1. **Read the lab spec.** Fetch the lab assignment page and test code from the course website.
 
-2. **Research the lab solution.**
+2. **Research the lab solution (tiered verification).**
 
-   - Write your own implementation based on course materials.
-   - Web search for existing discussions or solutions to cross-verify your approach.
-   - If test code is obtainable, run the lab test suite to verify correctness.
+   The skill uses a **3-tier verification strategy** to ensure code correctness:
+
+   | Tier | Method | Description | When to Use |
+   |------|--------|-------------|-------------|
+   | **T1** | Logical correctness review | Code walk-through: check algorithm matches spec, edge cases handled, concurrency correct. Check that all test scenarios would pass given the design. | **Always**. Minimum bar. |
+   | **T2** | Web search cross-reference | Search GitHub for existing verified solutions to the same lab. Compare approach, check for missed edge cases. Note: do NOT copy — use for verification only. | **Always**. Run in parallel with T1. |
+   | **T3** | Environment test run | If the environment has the required compiler and dependencies installed, clone the lab repo and run the test suite against your code. | **When environment permits**. Not required if T1+T2 pass. |
+
+   **Important**: If the environment cannot run tests (no compiler, no dependencies, restricted network), T1 + T2 are sufficient. Clearly state this limitation in the document.
 
 3. **Write the tutorial document.** Include all of the following:
 
    - **Complete, working code** that passes all tests. This is NOT pseudo-code. It must be real, compilable/runnable code.
    - **WHY explanation** for every code block: why this approach, why this function, why this parameter value.
+   - **Code diagrams**: Use Mermaid diagrams to illustrate complex control flows (see references/output-templates.md for templates).
    - **Interview prep notes**: what interviewers might ask about this lab, common follow-up questions.
    - **Test verification**: the exact commands to run and the expected output.
 
-4. **Verify correctness.** Either run the tests yourself (if the environment permits) or simulate the expected output based on thorough analysis. Never include code you have not verified.
+4. **Verify correctness.** Apply T1+T2 verification at minimum. If T3 is possible, run the tests and include the output.
 
 **Important:** Before starting this step, load `references/translation-guide.md` and `references/output-templates.md`.
 
@@ -176,13 +208,14 @@ Label each file with the following attribution at the bottom:
 
 ## Platform Support Overview
 
-| Tier | Platforms | Method | Reference File |
-|------|-----------|--------|----------------|
-| 1 | Bilibili, YouTube | Auto-fetch subtitles via webfetch | `references/bilibili.md`, `references/youtube.md` |
+| Tier | Type | Method | Reference File |
+|------|------|--------|----------------|
+| 0 | **Lecture Notes** (preferred) | Fetch .txt/.pdf notes from course website | `references/platforms-fallback.md` |
+| 1 | Bilibili, YouTube | Auto-fetch: try Python tools (yt-dlp), then webfetch | `references/bilibili.md`, `references/youtube.md` |
 | 2 | Coursera, edX, MIT OCW, others | Guide user to manually download subtitles | `references/platforms-fallback.md` |
 | 3 | Any | User pastes text directly | None needed |
 
-Tier 1 is preferred. If auto-fetch fails, fall back to Tier 2. If the user provides text directly, use Tier 3.
+Tier 0 (Lecture Notes) is preferred when available. If not, try Tier 1 auto-fetch. If auto-fetch fails, fall back to Tier 2. If the user provides text directly, use Tier 3.
 
 ## Language Style Guidelines
 
@@ -205,9 +238,9 @@ Example: "MapReduce is like a restaurant kitchen (通俗): many cooks prepare di
 
 1. **Accuracy.** Never fabricate course content, lecture transcripts, or lab solutions. If content is missing, say so.
 
-2. **Verification.** Always test lab code before including it in the output. Run the test suite or simulate expected output. Never include untested code.
+2. **Verification (tiered).** Use the 3-tier verification strategy from Step 4. Tier 1 (logical review) + Tier 2 (web cross-ref) are the minimum. Tier 3 (test run) is performed when the environment permits.
 
-3. **Honesty.** Mark uncertain translations with `[注: 此部分翻译可能不准确]`. If you cannot verify a lab solution, state the limitation.
+3. **Honesty.** Mark uncertain translations with `[注: 此部分翻译可能不准确]`. If you cannot fully verify a lab solution, state the limitation. Clearly label verification tier achieved.
 
 4. **Scope.** Never bypass paywalls, login-required content, or restricted access. If content is behind a login, tell the user they need to provide the content manually.
 
@@ -217,13 +250,13 @@ Example: "MapReduce is like a restaurant kitchen (通俗): many cooks prepare di
 
 7. **Attribution.** Every output file must end with: `学习辅助材料 - 非官方课程材料`. Never present the output as official course materials.
 
-8. **Context discipline.** Process ONE lecture per session. Do not batch an entire course in a single session. The output for one lecture includes all 3-4 document types for that single lecture only.
+8. **Context discipline (flexible).** By default, process ONE lecture per session to stay within context limits. If the user explicitly requests batch processing of multiple lectures, this rule may be overridden. In batch mode, use parallel background agents to generate documents independently, then verify outputs together.
 
-9. **No auto-discovery.** Do not crawl or scrape course websites to discover lectures. The user must provide all URLs explicitly.
+9. **Limited auto-discovery.** The skill may fetch course schedule pages to build a lecture list when the user provides only a course homepage URL. This is limited to metadata (lecture titles, topics, dates) and does NOT download full lecture content. Do not bypass paywalls or authentication.
 
-10. **No code execution for user code.** Do not execute code provided by the user. Only run test code from the course materials to verify reference implementations.
+10. **No code execution for user code.** Do not execute code provided by the user. Only run test code from the course materials to verify reference implementations (Tier 3 verification).
 
-11. **Lab verification.** Before writing a lab walkthrough, always verify the solution by running the lab test suite or by thorough cross-referencing with existing solutions. Never provide code that has not been verified.
+11. **Lecture notes priority.** When both lecture notes and video subtitles are available, use lecture notes as the primary content source and video subtitles as supplementary material.
 
 ## Reference Files
 
@@ -233,9 +266,9 @@ Read these files on demand when the corresponding situation arises. Do NOT load 
 |------|-----------|
 | `references/bilibili.md` | User provides a Bilibili video URL. Contains subtitle API patterns and fetch steps. |
 | `references/youtube.md` | User provides a YouTube video URL. Contains transcript extraction patterns. |
-| `references/platforms-fallback.md` | Auto-fetch fails, or user provides a URL from Coursera/edX/MIT OCW/other platforms. |
-| `references/translation-guide.md` | Starting Step 3 (Content Processing). Contains terminology rules, CS glossary, and style guidance. |
-| `references/output-templates.md` | Generating output files. Contains Markdown templates for all 4 document types. |
+| `references/platforms-fallback.md` | Auto-fetch fails, or user provides a URL from Coursera/edX/MIT OCW/other platforms. Also contains lecture notes fetching guidance. |
+| `references/translation-guide.md` | Starting Step 3 (Content Processing). Contains terminology rules, CS glossary (with web-search fallback), and style guidance. |
+| `references/output-templates.md` | Generating output files. Contains Markdown templates (including Mermaid diagrams) for all 4 document types. |
 
 ## Resources
 
@@ -245,4 +278,7 @@ Houses the 5 reference documents listed above. Each file focuses on a single con
 
 ### scripts/
 
-No helper scripts are needed for this skill. See `scripts/README.md` for details. All platform fetching is done via webfetch, and lab verification is done interactively.
+Contains optional helper scripts for enhanced subtitle acquisition. See `scripts/README.md` for details. Currently includes:
+- `scripts/fetch_transcript.py` — Python script using `youtube-transcript-api` or `yt-dlp` for YouTube subtitle extraction (used when Python environment is available).
+- Platform fetching can also be done via webfetch (built-in agent tool) as fallback.
+- Lab verification uses the 3-tier strategy: logical review + web cross-ref + optional test run.

@@ -18,7 +18,7 @@
 
 | English | 中文 | 何时保留英文 | 通俗解释 |
 |---------|------|-------------|---------|
-| **Distributed Systems** | | | |
+| **Distributed Systems Core** | | | |
 | Raft | 筏式共识 | always | 像一船人投票选船长，多数同意才能做决定的一致性算法 |
 | Paxos | 帕克索斯共识 | always | 比Raft更古老的共识协议，像多个议员投票通过法案 |
 | MapReduce | 映射归约 | always | 把大任务拆成小任务分给多台电脑算(映射)，再汇总结果(归约) |
@@ -34,65 +34,100 @@
 | Vector Clock | 向量时钟 | always | 记录每台机器事件顺序的机制，像给每个事件盖时间戳 |
 | Gossip Protocol | 八卦协议 | always | 节点间像传八卦一样互相传播信息，最终所有节点都知道 |
 | ZooKeeper | 动物园管理员 | always | 分布式系统的协调服务，管理配置、命名、同步等元信息 |
+| **Raft-Specific** | | | |
+| Term | 任期 | always | Raft中每次选举的编号，像总统的届数 |
+| Log Entry | 日志条目 | always | Raft日志中的一条记录，包含命令和任期号 |
+| Commit Index | 提交索引 | always | 已被多数节点确认、可以安全执行的日志位置 |
+| Applied Index | 应用索引 | always | 已被状态机执行的最新日志位置 |
+| Split Vote | 选票分裂 | always | 多个Candidate同时竞选，各自只拿到自己一票，无人胜出 |
+| Election Timeout | 选举超时 | always | Follower等待Leader心跳的超时时间，超时后发起选举 |
+| Heartbeat | 心跳 | always | Leader定期发给Follower的空AppendEntries，维持领导地位 |
+| **Consistency Models** | | | |
+| Linearizability | 线性一致性 | always | 所有操作按实时顺序原子执行，就像单机串行执行一样 |
+| Serializability | 可串行化 | always | 多个并发事务的执行结果与某种串行执行结果相同 |
+| Eventual Consistency | 最终一致性 | always | 如果没有新更新，所有副本最终会达到一致状态 |
+| Causal Consistency | 因果一致性 | always | 有因果关系的操作必须按因果顺序被所有节点看到 |
+| Snapshot Isolation | 快照隔离 | always | 每个事务看到的是某个时间点的数据快照，不受并发事务影响 |
+| **Transaction & Concurrency** | | | |
+| Two-Phase Commit (2PC) | 两阶段提交 | always | 分布式事务协议：先prepare询问所有参与者，再commit/abort |
+| Two-Phase Locking (2PL) | 两阶段锁 | always | 事务分为加锁阶段和解锁阶段，保证可串行化 |
+| Optimistic Concurrency Control (OCC) | 乐观并发控制 | always | 先执行后验证，冲突少时效率高 |
+| MVCC | 多版本并发控制 | Multi-Version Concurrency Control | 每个写操作创建新版本，读操作读取旧版本，读写互不阻塞 |
+| Blocking | 阻塞 | always | 事务因等待资源而暂停执行，无法继续推进 |
+| Deadlock | 死锁 | always | 多个事务互相等待对方持有的资源，谁也无法继续 |
+| Abort | 中止 | always | 事务执行失败，回滚所有已做的修改 |
+| **Replication & Fault Tolerance** | | | |
+| Primary-Backup | 主备复制 | always | 一个主副本处理请求，一个或多个备份副本同步数据 |
+| State Machine Replication (SMR) | 状态机复制 | always | 所有副本以相同顺序执行相同命令，保证状态一致 |
+| Split Brain | 脑裂 | always | 网络分区导致多个副本都认为自己是主节点，各自独立服务 |
+| Failover | 故障切换 | always | 主节点故障后，备份节点接管服务的过程 |
+| Fencing | 隔离栅 | always | 确保被判定为故障的节点不能再访问共享资源 |
+| Lease | 租约 | always | 给主节点一个时间窗口的授权，超时后自动失效 |
+| **Storage Systems** | | | |
+| Chunk | 数据块 | always | 大文件被切分成固定大小的存储单元(如GFS的64MB) |
+| Coordinator | 协调者 | always | 分布式系统中的中央控制节点，负责任务调度和元数据管理 |
+| Metadata | 元数据 | always | 描述数据的数据，如文件名、大小、位置等 |
+| Checksum | 校验和 | always | 数据完整性校验码，用于检测数据是否损坏 |
+| Namespace | 命名空间 | always | 名称的层级组织方式，如文件系统的目录树 |
+| **Security & Trust** | | | |
+| Byzantine Fault | 拜占庭故障 | always | 节点不仅可能崩溃，还可能恶意行为或发送错误信息 |
+| PBFT | 实用拜占庭容错 | Practical Byzantine Fault Tolerance | 容忍不超过1/3节点为拜占庭故障的共识协议 |
+| Proof of Work (PoW) | 工作量证明 | always | 通过计算难题来证明付出了计算资源，用于比特币挖矿 |
+| Cryptographic Hash | 密码学哈希 | always | 将任意数据映射为固定长度摘要的单向函数 |
+| Digital Signature | 数字签名 | always | 用私钥签名、公钥验证，确保数据的来源和完整性 |
+| Fork Consistency | 分支一致性 | always | 服务器可以隐藏更新造成分叉，但无法修复已产生的分叉 |
+| 51% Attack | 51%攻击 | always | 攻击者控制超过半数算力，可以逆转区块链交易 |
+| **Distributed Computing** | | | |
+| Gossip | 八卦传播 | always | 节点间随机交换信息，最终全网一致 |
+| Straggler | 掉队者 | always | 执行任务异常缓慢的节点，拖慢整体进度 |
+| Data Locality | 数据局部性 | always | 将计算任务调度到数据所在的节点，减少网络传输 |
+| Shuffle | 洗牌 | always | MapReduce中Map输出按key分组传输到Reduce节点的过程 |
+| Barrier | 屏障 | always | 同步点，所有参与者到达后才能继续执行 |
 | **Operating Systems** | | | |
 | Kernel | 内核 | always | 操作系统的核心，管理CPU、内存、设备等底层资源 |
 | Scheduler | 调度器 | always | 决定CPU下一个该运行哪个进程的组件，像老师安排谁先发言 |
 | Mutex | 互斥锁 | always | 保证同一时间只有一个线程能访问共享资源的锁机制 |
 | Semaphore | 信号量 | always | 控制多个线程访问有限资源的计数器，像厕所门口的指示灯 |
-| Deadlock | 死锁 | always | 多个线程互相等待对方释放资源，谁也无法继续执行 |
-| Virtual Memory | 虚拟内存 | always | 让程序以为自己有连续大内存，实际映射到物理内存+磁盘 |
-| Page Fault | 缺页中断 | always | 程序访问的虚拟内存页不在物理内存中，需从磁盘加载 |
 | Context Switch | 上下文切换 | always | CPU从执行一个进程切换到另一个进程时保存和恢复状态 |
-| DMA | 直接内存访问 | Direct Memory Access | 设备不经过CPU直接把数据写入内存，解放CPU去做别的 |
-| Interrupt | 中断 | always | 硬件通知CPU有紧急事情要处理，让CPU暂停当前工作 |
-| Syscall | 系统调用 | always | 用户程序请求操作系统服务的接口，像找政府办事要填表 |
 | **Networking** | | | |
 | TCP/IP | TCP/IP协议族 | always | 互联网的基础通信协议，TCP保证可靠传输，IP负责寻址路由 |
 | UDP | UDP协议 | always | 无连接的传输协议，像发短信不保证对方收到，但速度快 |
-| HTTP | HTTP协议 | always | 浏览器和服务器之间的通信协议，网页用的就是这个 |
-| DNS | 域名系统 | Domain Name System | 把人类易记的域名(google.com)转成机器用的IP地址 |
-| Load Balancer | 负载均衡器 | always | 把请求分发到多台服务器，不让某一台太忙，像前台分配顾客 |
-| CDN | 内容分发网络 | Content Delivery Network | 把内容缓存到离用户最近的服务器，加速访问速度 |
-| NAT | 网络地址转换 | Network Address Translation | 让多台设备共享一个公网IP上网，像小区用一个门牌号收快递 |
-| TLS/SSL | 传输层安全协议 | always | 加密网络通信防止窃听和篡改，网址锁头图标就是它 |
 | RPC | 远程过程调用 | Remote Procedure Call | 像调用本地函数一样调用远程服务器上的函数 |
-| Message Queue | 消息队列 | always | 把消息暂存起来让消费者异步处理，像快递暂存柜 |
 | Throughput | 吞吐量 | always | 单位时间内系统能处理的请求量 |
 | Latency | 延迟 | always | 从发出请求到收到响应的时间差 |
-| **Databases** | | | |
-| ACID | ACID特性 | 用英文缩写ACID | 事务的四个属性: 原子性、一致性、隔离性、持久性 |
-| BASE | BASE特性 | 用英文缩写BASE | 牺牲强一致性换取可用性的分布式设计哲学 |
-| Index | 索引 | always | 加速数据查询的数据结构，像书的目录页 |
-| Transaction | 事务 | always | 一组操作要么全做要么全不做，像银行转账扣钱和加钱必须同时成功 |
-| Replica | 副本 | always | 数据库数据的拷贝，用于容错或分担读请求 |
-| Shard | 分片 | always | 数据库水平切分后的数据片段 |
-| B-Tree | B树 | always | 数据库索引常用的一种平衡多路查找树结构 |
-| LSM-Tree | LSM树 | Log-Structured Merge-Tree | 写优化型数据结构，把随机写变顺序写，NoSQL数据库常用 |
 | **Programming / CS General** | | | |
 | Algorithm | 算法 | always | 解决问题的步骤和方法，像菜谱指导你一步步做出菜 |
-| Data Structure | 数据结构 | always | 组织和存储数据的方式，像衣柜、工具箱各有用途 |
-| Recursion | 递归 | always | 函数调用自身来解决问题，像照镜子时镜子里还有镜子 |
 | Cache | 缓存 | always | 把常用数据存到快速存储中加速访问，像把常吃的放冰箱上层 |
-| Hash Table | 哈希表 | always | 通过键直接计算存储位置的数据结构，查找极快 |
-| Queue | 队列 | always | 先进先出(FIFO)的数据结构，像排队买票 |
-| Stack | 栈 | always | 后进先出(LIFO)的数据结构，像叠盘子 |
-| Tree | 树 | always | 层次化数据结构，有根节点和子节点，像文件目录 |
-| Graph | 图 | always | 由节点和边组成的网络结构，像地铁线路图 |
 | Concurrency | 并发 | always | 多个任务交替执行让用户感觉同时进行(单核也能做) |
 | Parallelism | 并行 | always | 多个任务真正同时执行(需要多核CPU) |
-| Big O | 大O记法 | always | 描述算法效率随数据规模增长的增长率 |
 | API | 应用程序接口 | Application Programming Interface | 软件组件之间约定的通信方式，像餐厅的菜单 |
-| SDK | 软件开发工具包 | Software Development Kit | 开发某平台应用所需的工具集合，像乐高套装 |
-| Framework | 框架 | always | 提供基础设施和约定让开发者填业务逻辑的半成品软件 |
-| Middleware | 中间件 | always | 连接不同软件组件的中间层，像翻译官 |
-| Container | 容器 | always | 轻量级虚拟化技术，打包应用及其依赖一起运行 |
-| Virtualization | 虚拟化 | always | 把物理资源抽象成虚拟资源，一台物理机跑多个虚拟机 |
-| Microservice | 微服务 | always | 把大应用拆成多个小服务独立部署和扩展的架构风格 |
-| CI/CD | 持续集成/持续部署 | always | 自动化构建、测试和部署的软件开发实践 |
-| Design Pattern | 设计模式 | always | 被反复验证的代码组织模板，像建筑的经典户型图 |
-| Dependency Injection | 依赖注入 | always | 由外部传入依赖而非内部创建，降低耦合的设计技巧 |
+| Transaction | 事务 | always | 一组操作要么全做要么全不做，像银行转账扣钱和加钱必须同时成功 |
 
-## Part C: Quick Reference Patterns
+## Part C: Web-Search Fallback for Unknown Terms
+
+When a technical term is NOT in the glossary above:
+
+1. **Search the term online** using web search: search `{term} distributed systems definition` or `{term} 分布式系统`
+2. **Extract the Chinese translation** from the search results (typically from Chinese Wikipedia, CSDN, or official documentation)
+3. **For first occurrence**: write the term with your best-effort Chinese explanation in parentheses
+4. **Mark uncertain translations**: if you cannot find a reliable source, append `[注: 此术语翻译来自网络搜索，可能不准确]`
+
+### Example
+
+If the term `TrueTime` is not in the glossary:
+```markdown
+TrueTime(谷歌Spanner使用的时间同步服务，基于GPS和原子时钟，返回时间区间[earliest,latest])
+```
+
+### Priority for term sourcing
+
+1. This glossary (Predefined terms)
+2. Web search results (Chinese tech blogs, official docs, Wikipedia)
+3. If no reliable source: best-effort explanation + uncertainty marker
+
+---
+
+## Part D: Quick Reference Patterns
 
 **MapReduce 双风格示例:**
 
